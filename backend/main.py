@@ -13,13 +13,16 @@ app.config['SQLALCHEMY_DATABASE_URI'] = f"mysql+pymysql://{os.getenv('DB_USERNAM
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
+
 class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(50), nullable=False)
 
+
 # Check if the tasks table exists; if not, create it
 with app.app_context():
     db.create_all()
+
 
 @app.route('/tasks', methods=['GET', 'POST'])
 def handle_tasks():
@@ -33,6 +36,7 @@ def handle_tasks():
         db.session.add(new_task)
         db.session.commit()
         return jsonify({'message': 'Task added successfully'})
+
 
 @app.route('/tasks/<int:task_id>', methods=['DELETE'])
 def remove_task(task_id):
