@@ -1,0 +1,66 @@
+services:
+  
+  # Can be any name -- just create a service name
+  mariadb:
+    # Use docs for db otherwise for custom use build keyword
+    image: mariadb:latest
+    container_name: mariadb
+    # We can use always or on failure
+    restart: always
+    environment:
+      MARIADB_ROOT_PASSWORD: 123
+    ports:
+      - "3306:3306"
+    # Uses the network we created below at the end
+    networks:
+      - app-networks
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 1m
+    # Volume with path mentioned
+    volumes:
+      - db_data:/var/lib/mysql
+
+  python-backend:
+    build:
+      # context give path to our entire project dir
+      context: ./backend
+      dockerfile: Dockerfile
+    # Makes sure backend is listening to everything while itself on 5000
+    ports:
+      - 5000:5000
+    # Preferably use .env file so that secrets dont get exposed
+    environment:
+      - DB_USERNAME=root
+      - DB_PASSWORD=123
+      - DB_HOST=mariadb 
+      - DB__NAME=mysql
+    networks:
+      - app-networks
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+  react-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    # If we want use our docker network only we would have to create a reverse proxy
+    environment:
+      - REACT_APP_BACKEND_URL=http://localhost:5000
+    networks:
+        - app-networks
+
+networks:
+  app-networks:
+    driver: bridge
+
+volumes:
+  db_data:
+
+

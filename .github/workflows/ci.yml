@@ -1,0 +1,106 @@
+name: CICD Pipeline for Testing Branches
+
+run-name: >
+  CI Pipeline triggered by ${{ github.actor }}
+  on branch: ${{ github.ref }}
+  on event: ${{ github.event }}
+  on repository: ${{ github.repository }}
+
+on:
+  push:
+    branches:
+      - 'main'
+
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: devops/tutorial_app
+  IMAGE_TAG: ${{ github.sha }}
+  EC2_PUBLIC_IP: ${{ secrets.EC2_HOST }}
+
+permissions:
+  id-token: write
+
+jobs:
+  deploy_ecr_with_oicd:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@main
+        with:
+          # Role ARN
+          role-to-assume: arn:aws:iam::197876517930:role/github_cicd_devops
+          aws-region: ${{ env.AWS_REGION }}
+          
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and Push Backend Docker Images to ECR
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend/
+          file: ./backend/Dockerfile
+          push: true
+          registry: ${{ steps.login-ecr.outputs.registry }} 
+          repository: ${{ env.ECR_REPOSITORY }}-backend
+          tags: ${{ env.IMAGE_TAG }}
+
+      - name: Build and Push Frontend Docker Image to ECR
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend/
+          file: ./frontend/Dockerfile
+          push: true
+          registry: ${{ steps.login-ecr.outputs.registry }} 
+          repository: ${{ env.ECR_REPOSITORY }}-frontend
+          tags: ${{ env.IMAGE_TAG }}
+
+  deploy_on_ec2:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Secure Copy Docker Compose into EC2
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }} 
+          username: ubuntu
+          key: ${{ secrets.AWS_SSH_KEY }}
+          source: "docker-compose-prod.yml"
+          target: "/home/ubuntu/cs423_app"
+
+      - name: Execute SSH to EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }} 
+          username: ubuntu
+          key: ${{ secrets.AWS_SSH_KEY }}
+          envs: ECR_REPOSITORY, IMAGE_TAG, AWS_REGION, EC2_PUBLIC_IP
+          script: |
+
+            mkdir -p /home/ubuntu/cs423_app
+            cd /home/ubuntu/cs423_app
+
+            # Login to ECR
+            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+            
+            echo "IMAGE_TAG=$IMAGE_TAG" > .env
+            echo "REPOSITORY_URI=$ECR_REGISTRY/$ECR_REPOSITORY" >> .env
+            echo "EC2_PUBLIC_IP=$EC2_PUBLIC_IP" >> .env
+
+            docker compose pull
+            docker compose up -d --remove-orphans
+            
+
+    
+
+
+
+
+
