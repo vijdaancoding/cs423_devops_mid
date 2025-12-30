@@ -22,6 +22,7 @@ env:
 permissions:
   id-token: write
 
+
 jobs:
   deploy_ecr_with_oicd:
     runs-on: ubuntu-latest
@@ -41,24 +42,43 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build and Push Backend Docker Images to ECR
-        uses: docker/build-push-action@v6
-        with:
-          context: ./backend/
-          file: ./backend/Dockerfile
-          push: true
-          registry: ${{ steps.login-ecr.outputs.registry }} 
-          repository: ${{ env.ECR_REPOSITORY }}-backend
-          tags: ${{ env.IMAGE_TAG }}
+        id: docker-build
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}-backend
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./backend
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-      - name: Build and Push Frontend Docker Image to ECR
-        uses: docker/build-push-action@v6
-        with:
-          context: ./frontend/
-          file: ./frontend/Dockerfile
-          push: true
-          registry: ${{ steps.login-ecr.outputs.registry }} 
-          repository: ${{ env.ECR_REPOSITORY }}-frontend
-          tags: ${{ env.IMAGE_TAG }}
+
+        # uses: docker/build-push-action@v6
+        # with:
+        #   context: ./backend/
+        #   file: ./backend/Dockerfile
+        #   push: true
+        #   registry: ${{ steps.login-ecr.outputs.registry }} 
+        #   repository: ${{ env.ECR_REPOSITORY }}-backend
+        #   tags: ${{ env.IMAGE_TAG }}
+
+      - name: Build and Push Frontend Docker Images to ECR
+        id: docker-build
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}-frontend
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./frontend
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+        # uses: docker/build-push-action@v6
+        # with:
+        #   context: ./frontend/
+        #   file: ./frontend/Dockerfile
+        #   push: true
+        #   registry: ${{ steps.login-ecr.outputs.registry }} 
+        #   repository: ${{ env.ECR_REPOSITORY }}-frontend
+        #   tags: ${{ env.IMAGE_TAG }}
 
   deploy_on_ec2:
     runs-on: ubuntu-latest
@@ -98,10 +118,3 @@ jobs:
             docker compose pull
             docker compose up -d --remove-orphans
             
-
-    
-
-
-
-
-
