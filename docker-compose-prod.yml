@@ -28,7 +28,7 @@ services:
     image: ${REPOSITORY_URI}-backend:${IMAGE_TAG} 
     # Makes sure backend is listening to everything while itself on 5000
     ports:
-      - 5000:5000
+      - 8000:5000
     # Preferably use .env file so that secrets dont get exposed
     environment:
       - DB_USERNAME=root
@@ -44,10 +44,13 @@ services:
   react-frontend:
     image: ${REPOSITORY_URI}-frontend:${IMAGE_TAG} 
     ports:
-      - "80:80"
+      - "80:3000"
     # If we want use our docker network only we would have to create a reverse proxy
     environment:
-      - REACT_APP_BACKEND_URL=http://${EC2_PUBLIC_IP}:5000
+      - REACT_APP_BACKEND_URL=http://${EC2_PUBLIC_IP}:8000
+      # For some reason this is internal error of node and we have to allow it to listen to eveything
+      - WDS_SOCKET_HOST=0.0.0.0
+      - DANGEROUSLY_DISABLE_HOST_CHECK=true
     networks:
         - app-networks
 
